@@ -1,7 +1,9 @@
 package com.george.rest_api;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 import org.eclipse.rdf4j.model.IRI;
@@ -121,68 +123,86 @@ public static Model buildStressLvl (String text) 	throws JsonSyntaxException, Js
 public static Model buildText (String text) 	throws JsonSyntaxException, JsonIOException, IOException, ParseException
 {
 
-	System.out.println("we are in population");
+	
 	//String uuid = UUID.randomUUID().toString().replaceAll("-", "");
 	ModelBuilder builder = new ModelBuilder();
 	
+	Instant instant = Instant.now();
+	DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS").withZone( ZoneId.systemDefault() );
+	String formater_output = DATE_TIME_FORMATTER.format( instant );
+												
 	
 	Object obj=JSONValue.parse(text);
 	JSONObject jsonObj= (JSONObject) obj;
 	JSONObject json_meta= (JSONObject) jsonObj.get("meta");
 	JSONObject json_data= (JSONObject) jsonObj.get("data");
-	
+	LocalDateTime current_time=  LocalDateTime.parse(formater_output,DATE_TIME_FORMATTER);
 	String id=json_meta.get("id").toString().replaceAll("-", "");
 	String projectId= json_meta.get("project_id").toString();
-	String type= json_meta.get("type").toString();
-	
-	
-	JSONArray objJASON_Array=(JSONArray) json_data.get("situations");
-	JSONObject json_sit=(JSONObject)objJASON_Array.get(0);
-	
-	String locationURI=json_sit.get("location").toString();
-	String coordinates=json_sit.get("coordinates").toString();
-	String parts[] = coordinates.split("(?<= N)");
-	String latitude= parts[0];
-	System.out.println(latitude);
-	String longtitude= parts[1];
-	String risk_lvl=json_sit.get("risk_level").toString();
+	String type= json_data.get("type").toString();
 	
 	IRI ObservationInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "Observation_"+id);
-	IRI LocationInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "Location_"+id);
-	 
+	
+	JSONArray objJASON_Array=(JSONArray) json_data.get("situations");
+	
 	builder
-	 	.setNamespace("xR","http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA")
-	 		.subject(ObservationInstance)
-		 	.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
-		  	.add(RDFS.LABEL, "Observation_"+id)
-		  	.add(RDF.TYPE,"xR:#Observation")
-		  	.add("xR:isConsistedIn", "xR:Project_"+projectId)
-	  	.subject(LocationInstance)
-			.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
-			.add(RDFS.LABEL, "Location_"+id)
-		  	.add(RDF.TYPE,"xR:#Location")
-		  	.add("xR:hasLatitude",latitude )
-		  	.add("xR:hasLongitude", longtitude)
-		  	.add("xR:hasURI", locationURI);
+ 	.setNamespace("xR","http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA")
+ 		.subject(ObservationInstance)
+	 	.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
+	  	.add(RDFS.LABEL, "Observation_"+id)
+	  	.add(RDF.TYPE,"xR:#Observation")
+	  	.add("xR:hasObservationType", type)
+	  	.add("xR:hasCurrentTime", current_time)
+	  	.add("xR:isConsistedIn", "xR:Project_"+projectId);
 	
-	if ((json_sit.get("objectsFound"))!=null) { 	
-	
-	JSONArray objJASON_Array_2=(JSONArray) json_sit.get("affected_objects");
-	for (int i = 0; i < objJASON_Array_2.size(); i++) {
+	for (int i = 0; i < objJASON_Array.size(); i++) {
 		
-		IRI InfoOfIntInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "InformationOfInterest"+ id +"_"+ i);
+		JSONObject json_sit=(JSONObject)objJASON_Array.get(i);
 		
-		String objects= objJASON_Array_2.get(i).toString();
+		if (json_sit.containsKey("location") && json_sit.containsKey("coordinates") ) {
+			String locationURI=json_sit.get("location").toString();
+			String coordinates=json_sit.get("coordinates").toString();
+			String parts[] = coordinates.split("(?<= N)");
+			String latitude= parts[0];
+			System.out.println(latitude);
+			String longtitude= parts[1]; 
+
+			if (latitude !=null && longtitude!= null && locationURI !=null ) {  	
+			
+			IRI LocationInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "Location_"+i);
+			
+			builder
+			.subject(LocationInstance)
+				.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
+				.add(RDFS.LABEL, "Location_"+id)
+			  	.add(RDF.TYPE,"xR:#Location")
+			  	.add("xR:hasLatitude",latitude )
+			  	.add("xR:hasLongitude", longtitude)
+			  	.add("xR:hasURI", locationURI);
+			}
+		}
 		
-		builder
-		.subject(InfoOfIntInstance)
-		.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
-  		.add(RDFS.LABEL, "InformationOfInterest"+ id +"_"+ i)
-  		.add(RDF.TYPE,"xR:#InformationOfInterest")
-		.add("xR:hasType", objects)
-		.add("xR:featureOf",ObservationInstance);
+		if (json_sit.containsKey("risk_lvl")) {String risk_lvl=json_sit.get("risk_level").toString();}
 		
-	}
+		if ((json_sit.get("objectsFound"))!=null) { 	
+			
+		JSONArray objJASON_Array_2=(JSONArray) json_sit.get("affected_objects");
+		for (int j = 0; i < objJASON_Array_2.size(); j++) {
+			
+			IRI InfoOfIntInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "InformationOfInterest"+ id +"_"+ i);
+			
+			String objects= objJASON_Array_2.get(j).toString();
+			
+			builder
+			.subject(InfoOfIntInstance)
+				.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
+		  		.add(RDFS.LABEL, "InformationOfInterest"+ id +"_"+ j)
+		  		.add(RDF.TYPE,"xR:#InformationOfInterest")
+				.add("xR:hasType", objects)
+				.add("xR:featureOf",ObservationInstance);
+			
+		}
+		}	
 	}
 
 	 return builder.build();	
@@ -194,7 +214,11 @@ public static Model buildVisuals (String text) 	throws JsonSyntaxException, Json
 {
 	System.out.println("we are in population");
 	String uuid = UUID.randomUUID().toString().replaceAll("-", "");
-	DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
+	
+	Instant instant = Instant.now();
+	DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS").withZone( ZoneId.systemDefault() );
+	String formater_output = DATE_TIME_FORMATTER.format( instant );
+	LocalDateTime current_time=  LocalDateTime.parse(formater_output,DATE_TIME_FORMATTER);
 	
 	Object obj=JSONValue.parse(text);
 	JSONObject jsonObj= (JSONObject) obj;
@@ -218,6 +242,7 @@ public static Model buildVisuals (String text) 	throws JsonSyntaxException, Json
   		.add(RDF.TYPE,"xR:#Observation")
   		.add("xR:isConsistedIn", "xR:Project_"+projectId)
   		.add("xR:hasTime", time)
+  		.add("xR:hasCurrentTime", current_time)
   		.add("xR:hasMultimedia", VideoInstance)
   	.subject(VideoInstance)
   		.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
@@ -259,11 +284,13 @@ public static Model buildVisuals (String text) 	throws JsonSyntaxException, Json
 	  		.add("xR:peopleInDanger", people)
 	  		.add("xR:vehicleInDanger", vehicles)
 	  		.add("xR:hasRiverOvertop", river)
-	  		.add("xR:", area)
+	  		.add("xR:hasArea", area)
 	  		.add("xR:hasAreaProb", areaProb)
 	  		.add("xR:isOutdoor", outdoor)
 	  		.add("xR:hasEmergencyProb", emergencyProb)
-	  		.add("xR:",emergency);
+	  		.add("xR:hasEmergency",emergency)
+	  	.subject(ObservationInstance)
+	  		.add("xR:hasMetadata", "VisualMetadata_"+ uuid +"_"+ i);
 		
 		if ((json_shot.get("objectsFound"))!=null) {
 			
