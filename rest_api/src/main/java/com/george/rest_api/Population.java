@@ -15,7 +15,6 @@ import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
 
 import static org.eclipse.rdf4j.model.util.Values.iri;
-
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -69,10 +68,14 @@ public static Model buildStressLvl (String text) 	throws JsonSyntaxException, Js
 	Object obj=JSONValue.parse(text);
 	JSONObject jsonObj= (JSONObject) obj;
 
-	DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");   
+	DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS"); 
     String id= jsonObj.get("User_ID").toString();
     String lvl=jsonObj.get("Stress_Level").toString();
-    float lvlf=Float.parseFloat(lvl); 
+    float lvlf=Float.parseFloat(lvl);
+    String label=" ";
+    if (lvlf < 33) { label = "Low"; }
+    else if (lvlf>=33 && lvlf<=66) { label = "Moderated";}
+    else { label = "High";}
     String StringTime=jsonObj.get("Timestamp").toString();
     String lat=jsonObj.get("Latitude").toString();
     String log=jsonObj.get("Longitude").toString();
@@ -102,6 +105,7 @@ public static Model buildStressLvl (String text) 	throws JsonSyntaxException, Js
 		  	.add(RDFS.LABEL, "Result_"+uuid)
 		  	.add(RDF.TYPE,"xR:#Result")
 		  	.add("xR:hasStressLevel",lvlf)
+		  	.add("xR:hasResultLabel", label)
 		.subject(LocationInstance)
 			.add(RDF.TYPE, OWL.NAMEDINDIVIDUAL)
 			.add(RDFS.LABEL, "Location_"+uuid)
@@ -122,6 +126,7 @@ public static Model buildStressLvl (String text) 	throws JsonSyntaxException, Js
 public static Model buildText (String text) 	throws JsonSyntaxException, JsonIOException, IOException, ParseException
 {
 
+
 	
 	//String uuid = UUID.randomUUID().toString().replaceAll("-", "");
 	ModelBuilder builder = new ModelBuilder();
@@ -141,7 +146,8 @@ public static Model buildText (String text) 	throws JsonSyntaxException, JsonIOE
 	String type= json_data.get("type").toString();
 	
 	IRI ObservationInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "Observation_"+id);
-	
+	IRI LocationInstance = null;
+	IRI InfoOfIntInstance = null;
 	JSONArray objJASON_Array=(JSONArray) json_data.get("situations");
 	
 	builder
@@ -168,7 +174,7 @@ public static Model buildText (String text) 	throws JsonSyntaxException, JsonIOE
 
 			if (latitude !=null && longtitude!= null && locationURI !=null ) {  	
 			
-			IRI LocationInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "Location_"+i);
+			 LocationInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "Location_"+i);
 			
 			builder
 			.subject(LocationInstance)
@@ -188,7 +194,7 @@ public static Model buildText (String text) 	throws JsonSyntaxException, JsonIOE
 		JSONArray objJASON_Array_2=(JSONArray) json_sit.get("affected_objects");
 		for (int j = 0; i < objJASON_Array_2.size(); j++) {
 			
-			IRI InfoOfIntInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "InformationOfInterest"+ id +"_"+ i);
+			 InfoOfIntInstance = Values.iri("http://www.semanticweb.org/ontologies/2021/5/InitialxR4DRAMA", "InformationOfInterest"+ id +"_"+ i);
 			
 			String objects= objJASON_Array_2.get(j).toString();
 			
@@ -199,9 +205,16 @@ public static Model buildText (String text) 	throws JsonSyntaxException, JsonIOE
 		  		.add(RDF.TYPE,"xR:#InformationOfInterest")
 				.add("xR:hasType", objects)
 				.add("xR:featureOf",ObservationInstance);
+				
 			
 		}
 		}	
+		if (LocationInstance != null && InfoOfIntInstance != null) {
+			
+			builder
+			.subject(InfoOfIntInstance)
+				.add("xR:hasLocation",LocationInstance);
+		}
 	}
 
 	 return builder.build();	
